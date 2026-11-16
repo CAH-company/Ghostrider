@@ -49,3 +49,7 @@ Największe koszty: dekodowanie 4K HEVC, YOLO na każdej klatce, SIFT. Z GPU (CU
 - Start trzeba oznaczyć ręcznie w obu filmach (ten sam moment, np. bramka startowa); bez tego wynik
   jest liczony od początku plików.
 - Jedno zadanie naraz (kolejka).
+
+## Wdrożenie
+
+Web (`web/`) działa na Vercelu (katalog główny: `web`), przetwarzanie na Modal (`twinrun/modal_app`), pliki w Cloudflare R2. Sekretów nie trzymamy w repo.
