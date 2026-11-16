@@ -1,0 +1,12 @@
+services:
+  twinrun:
+    build: .
+    container_name: twinrun
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - GL_PASSWORD=${GL_PASSWORD:-}        # set to protect the demo with a password
+      - GL_RENDER_WIDTH=${GL_RENDER_WIDTH:-1280}
+    volumes:
+      - ./data:/data

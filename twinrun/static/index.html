@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TwinRun · PAH</title>
+<style>
+:root{--bg:#f2f4f6;--card:#fff;--ink:#14181d;--mute:#66707a;--line:#dde2e7;--a:#ff5a28;--b:#28c8ff;--ok:#2fa84f;--r:14px}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:28px 20px 8px;max-width:1180px;margin:auto}
+h1{margin:0;font-size:28px;letter-spacing:-.02em}
+h1 span{color:var(--b)}
+header p{margin:6px 0 0;color:var(--mute)}
+main{max-width:1180px;margin:auto;padding:12px 20px 60px}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:820px){.steps{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h2{margin:0 0 2px;font-size:17px;display:flex;align-items:center;gap:8px}
+.tag{display:inline-block;color:#fff;border-radius:6px;padding:1px 8px;font-size:13px;font-weight:600}
+.tag.a{background:var(--a)}.tag.b{background:var(--b)}
+.hint{color:var(--mute);font-size:13px;margin:0 0 10px}
+.drop{display:block;border:2px dashed var(--line);border-radius:12px;padding:34px 12px;text-align:center;color:var(--mute);cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--b);background:#f4fbff}
+.drop input{display:none}
+video{width:100%;border-radius:10px;background:#000;display:block;aspect-ratio:16/9}
+.ctrl{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px 11px;cursor:pointer}
+button:hover{border-color:#b9c2cb}
+button.primary{background:var(--ink);color:#fff;border-color:var(--ink);padding:11px 22px;font-weight:600;font-size:16px}
+button.primary:disabled{opacity:.35;cursor:not-allowed}
+button.mark{font-weight:600}
+.marks{display:flex;gap:14px;margin-top:8px;font-size:13px;color:var(--mute)}
+.marks b{color:var(--ink);font-variant-numeric:tabular-nums}
+.time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--mute);margin-left:auto}
+.name{margin-top:10px;display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mute)}
+.name input{font:inherit;border:1px solid var(--line);border-radius:8px;padding:5px 8px;width:140px}
+.go{margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.bar{flex:1;min-width:220px;height:10px;background:#e3e7eb;border-radius:6px;overflow:hidden;display:none}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--b),#1a8fd6);transition:width .4s}
+#stage{color:var(--mute);font-size:14px}
+#result{margin-top:16px;display:none}
+#result .meta{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
+a.dl{background:var(--ink);color:#fff;text-decoration:none;padding:9px 16px;border-radius:9px;font-weight:600}
+.err{color:#c62828}
+.tips{margin-top:16px;color:var(--mute);font-size:13px}
+.tips li{margin:3px 0}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:12px;background:#fff}
+</style>
+</head>
+<body>
+<header>
+  <h1>Twin<span>Run</span></h1>
+  <p>Dwa przejazdy, jedno wideo. Prototyp Poland Automation Hub.</p>
+</header>
+<main>
+  <div class="steps">
+    <section class="card" data-side="a">
+      <h2><span class="tag a">A</span> Przejazd główny</h2>
+      <p class="hint">Z tej kamery powstanie widok końcowy.</p>
+      <div class="slot"></div>
+    </section>
+    <section class="card" data-side="b">
+      <h2><span class="tag b">B</span> Przejazd „duch”</h2>
+      <p class="hint">Nagrany z tego samego miejsca. Zoom może być inny.</p>
+      <div class="slot"></div>
+    </section>
+  </div>
+
+  <div class="card go">
+    <button class="primary" id="run" disabled>Nałóż przejazdy</button>
+    <div class="bar" id="bar"><i></i></div>
+    <span id="stage">Wgraj oba filmy i ustaw ten sam moment startu (np. przecięcie bramki startowej).</span>
+  </div>
+
+  <section class="card" id="result">
+    <video id="out" controls playsinline></video>
+    <div class="meta">
+      <a class="dl" id="dl" download="twinrun.mp4">Pobierz MP4</a>
+      <span id="summary"></span>
+    </div>
+  </section>
+
+  <ul class="tips">
+    <li>Filmuj oba przejazdy z tego samego miejsca. Przesunięcie o kilka metrów psuje dopasowanie.</li>
+    <li>Wgrywaj oryginalne pliki z telefonu, nie przesyłane przez WhatsAppa.</li>
+    <li>Klatka po klatce: <kbd>←</kbd> <kbd>→</kbd> (z <kbd>Shift</kbd> po 10 klatek), gdy wideo jest zaznaczone.</li>
+  </ul>
+</main>
+
+<template id="tpl-drop">
+  <label class="drop"><input type="file" accept="video/*,.mov,.mp4">
+    <div><b>Wybierz lub upuść film</b><br><small>MP4 / MOV, najlepiej 1080p+, 60 fps</small></div>
+  </label>
+</template>
+<template id="tpl-player">
+  <video playsinline muted tabindex="0"></video>
+  <div class="ctrl">
+    <button data-step="-10">−10</button><button data-step="-1">−1</button>
+    <button data-play>▶︎</button>
+    <button data-step="1">+1</button><button data-step="10">+10</button>
+    <button class="mark" data-mark="start">Start</button>
+    <button class="mark" data-mark="end">Koniec</button>
+    <span class="time">0.00 s</span>
+  </div>
+  <div class="marks">Start: <b data-v="start">0.00 s</b> Koniec: <b data-v="end">–</b> <a href="#" data-reset>zmień plik</a></div>
+  <div class="name">Nazwa na wideo: <input maxlength="12"></div>
+</template>
+
+<script>
+const S = {a:null, b:null};
+const $ = (s, el=document) => el.querySelector(s);
+
+function fmt(t){ return t==null ? "–" : t.toFixed(2) + " s"; }
+
+function mountDrop(side){
+  const card = $(`[data-side=${side}] .slot`);
+  card.innerHTML = "";
+  card.append($("#tpl-drop").content.cloneNode(true));
+  const drop = $(".drop", card), input = $("input", card);
+  input.onchange = () => input.files[0] && upload(side, input.files[0]);
+  drop.ondragover = e => {e.preventDefault(); drop.classList.add("over");};
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => {e.preventDefault(); drop.classList.remove("over"); e.dataTransfer.files[0] && upload(side, e.dataTransfer.files[0]);};
+  S[side] = null; refresh();
+}
+
+function upload(side, file){
+  const card = $(`[data-side=${side}] .slot`);
+  card.innerHTML = `<div class="drop"><b>Wgrywanie…</b> <span class="pct">0%</span><br><small>${file.name}</small></div>`;
+  const fd = new FormData(); fd.append("file", file);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/upload");
+  xhr.upload.onprogress = e => { if(e.lengthComputable){ const p = Math.round(e.loaded/e.total*100); $(".pct", card).textContent = p < 100 ? p + "%" : "przygotowuję podgląd…"; } };
+  xhr.onload = () => {
+    if(xhr.status !== 200){ card.innerHTML = `<p class="err">Błąd: ${xhr.responseText}</p>`; setTimeout(()=>mountDrop(side), 2500); return; }
+    mountPlayer(side, JSON.parse(xhr.responseText));
+  };
+  xhr.onerror = () => { card.innerHTML = `<p class="err">Błąd sieci</p>`; setTimeout(()=>mountDrop(side), 2500); };
+  xhr.send(fd);
+}
+
+function mountPlayer(side, meta){
+  const card = $(`[data-side=${side}] .slot`);
+  card.innerHTML = "";
+  card.append($("#tpl-player").content.cloneNode(true));
+  const v = $("video", card), fps = meta.fps || 30;
+  v.src = meta.preview;
+  S[side] = {id: meta.id, fps, start: 0, end: null, v, name: side.toUpperCase()};
+  const nameIn = $(".name input", card); nameIn.value = S[side].name;
+  nameIn.oninput = () => S[side].name = nameIn.value;
+  const timeEl = $(".time", card);
+  const tick = () => timeEl.textContent = fmt(v.currentTime);
+  v.ontimeupdate = tick; v.onseeked = tick;
+  const step = n => { v.pause(); v.currentTime = Math.max(0, Math.min(v.duration||1e9, v.currentTime + n/fps)); };
+  card.querySelectorAll("[data-step]").forEach(b => b.onclick = () => step(+b.dataset.step));
+  $("[data-play]", card).onclick = () => v.paused ? v.play() : v.pause();
+  v.onclick = () => v.paused ? v.play() : v.pause();
+  v.onkeydown = e => {
+    if(e.key === "ArrowRight"){ e.preventDefault(); step(e.shiftKey?10:1); }
+    if(e.key === "ArrowLeft"){ e.preventDefault(); step(e.shiftKey?-10:-1); }
+    if(e.key === " "){ e.preventDefault(); v.paused ? v.play() : v.pause(); }
+  };
+  card.querySelectorAll("[data-mark]").forEach(b => b.onclick = () => {
+    const k = b.dataset.mark; S[side][k] = v.currentTime;
+    if(S[side].end != null && S[side].end <= S[side].start) S[side].end = null;
+    $("[data-v=start]", card).textContent = fmt(S[side].start);
+    $("[data-v=end]", card).textContent = fmt(S[side].end);
+  });
+  $("[data-reset]", card).onclick = e => { e.preventDefault(); mountDrop(side); };
+  refresh();
+}
+
+function refresh(){ $("#run").disabled = !(S.a && S.b); }
+
+$("#run").onclick = async () => {
+  $("#run").disabled = true;
+  $("#result").style.display = "none";
+  const body = {a:S.a.id, b:S.b.id, a_start:S.a.start, a_end:S.a.end, b_start:S.b.start, b_end:S.b.end,
+                name_a:S.a.name||"A", name_b:S.b.name||"B"};
+  const r = await fetch("/api/jobs", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body)});
+  if(!r.ok){ $("#stage").innerHTML = `<span class="err">Błąd: ${await r.text()}</span>`; refresh(); return; }
+  const {id} = await r.json();
+  $("#bar").style.display = "block";
+  poll(id);
+};
+
+const STAGE = {queued:"W kolejce…", prepare:"Przygotowanie filmów", "analyze A":"Analiza przejazdu A", "analyze B":"Analiza przejazdu B", align:"Wyrównywanie kamer", render:"Renderowanie"};
+
+async function poll(id){
+  const r = await fetch(`/api/jobs/${id}`); const st = await r.json();
+  $("#bar i").style.width = Math.round((st.progress||0)*100) + "%";
+  if(st.state === "error"){ $("#stage").innerHTML = `<span class="err">Nie udało się: ${st.error}</span>`; refresh(); return; }
+  if(st.state === "done"){
+    $("#stage").textContent = `Gotowe w ${st.seconds} s`;
+    $("#out").src = st.video; $("#dl").href = st.video;
+    const g = st.result && st.result.final_gap;
+    $("#summary").textContent = g==null ? "" : `Na końcu: ${S.a.name} ${g<0?"szybciej":"wolniej"} o ${Math.abs(g).toFixed(2)} s niż ${S.b.name}`;
+    $("#result").style.display = "block"; refresh(); return;
+  }
+  $("#stage").textContent = (STAGE[st.stage]||st.stage) + "… " + Math.round((st.progress||0)*100) + "%";
+  setTimeout(() => poll(id), 1500);
+}
+
+mountDrop("a"); mountDrop("b");
+</script>
+</body>
+</html>
