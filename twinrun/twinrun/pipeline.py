@@ -29,7 +29,7 @@ def _write(job_dir, on_status=None, **kw):
 
 
 def process(job_dir, a_src, b_src, a_start=0.0, a_end=None, b_start=0.0, b_end=None,
-            name_a="A", name_b="B", render_width=1920, on_status=None):
+            name_a="A", name_b="B", render_width=1280, on_status=None):
     """Stages: prepare, analyze (A and B in parallel), align, render. `on_status(dict)` is called on every
     status change (the caller throttles). Returns timings dict (seconds per stage)."""
     weights = {"prepare": (0.0, 0.10), "analyze": (0.10, 0.60), "align": (0.70, 0.10), "render": (0.80, 0.20)}

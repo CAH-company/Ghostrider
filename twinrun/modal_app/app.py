@@ -147,3 +147,45 @@ def main(a_key: str, b_key: str, a_start: float = 0.0, a_end: float = 0.0, b_sta
     meta = process_job.remote(job_id, a_key, b_key, a_start, a_end or None, b_start, b_end or None, name_a, name_b)
     print("job:", job_id)
     print(json.dumps(meta, indent=2, default=str))
+
+
+@app.function(gpu="L4", cpu=CPU, memory=MEM_MB, timeout=1200, secrets=[r2_secret])
+def debug_detect(a_key: str, b_key: str, a_start: float = 0.0, b_start: float = 0.0):
+    """Diagnostics: detections and tracking per video, same code path as process_job."""
+    import tempfile
+    from concurrent.futures import ThreadPoolExecutor
+    import numpy as np
+    from twinrun import ingest, analyze
+    from twinrun.track import track_main, interpolate_boxes
+
+    s3, d = _s3(), tempfile.mkdtemp()
+    out = {}
+    paths = {}
+    for k, key, st in (("a", a_key, a_start), ("b", b_key, b_start)):
+        src = f"{d}/src_{k}"
+        s3.download_file(os.environ["R2_BUCKET"], key, src)
+        out[k] = {"probe": ingest.probe(src)}
+        paths[k] = f"{d}/{k}.mp4"
+        ingest.normalize(src, paths[k], start=st, fps=out["a"]["probe"]["fps"])
+    with ThreadPoolExecutor(2) as ex:
+        fut = {k: ex.submit(analyze.analyze, p) for k, p in paths.items()}
+        an = {k: f.result() for k, f in fut.items()}
+    for k in ("a", "b"):
+        dets = an[k]["dets"]
+        cnt = [len(x) for x in dets]
+        confs = [max((y["conf"] for y in x), default=0) for x in dets]
+        idx = track_main(dets, an[k]["G"], an[k]["shape"])
+        boxes, _ = interpolate_boxes(dets, idx, an[k]["G"])
+        has = [i for i, c in enumerate(cnt) if c > 0]
+        out[k].update(first_det=has[0] if has else None, last_det=has[-1] if has else None,
+                      frames=len(dets), shape=an[k]["shape"], fps=an[k]["fps"],
+                      frames_with_det=int(sum(c > 0 for c in cnt)), mean_dets=round(float(np.mean(cnt)), 2),
+                      max_conf_mean=round(float(np.mean(confs)), 3),
+                      tracked=int(sum(i is not None and i >= 0 for i in idx)),
+                      boxes_not_none=int(sum(b is not None for b in boxes)))
+    return out
+
+
+@app.local_entrypoint()
+def dbg(a_key: str, b_key: str, a_start: float = 0.0, b_start: float = 0.0):
+    print(json.dumps(debug_detect.remote(a_key, b_key, a_start, b_start), indent=1, default=str))

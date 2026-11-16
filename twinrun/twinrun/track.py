@@ -44,7 +44,7 @@ def track_main(dets, G, shape, K=12, miss_cost=1.2):
     back = [[None] * len(c) for c in cand]
     for t in range(n):
         for k, (g, s, h, u) in enumerate(cand[t]):
-            best = u + miss_cost * t if t < K else INF  # may start here
+            best = u + miss_cost * t  # may start here (skier can enter the frame late)
             arg = None
             for tp in range(max(0, t - K), t):
                 gap = t - tp
@@ -64,7 +64,7 @@ def track_main(dets, G, shape, K=12, miss_cost=1.2):
             back[t][k] = arg
     # end within last K frames
     best, end = INF, None
-    for t in range(max(0, n - K), n):
+    for t in range(n):  # skier can also leave the frame before the clip ends
         for k in range(len(cand[t])):
             c = cost[t][k] + miss_cost * (n - 1 - t)
             if c < best:
